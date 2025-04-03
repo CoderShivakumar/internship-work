@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Recent } from './components/Recent';
 import { relative } from 'path';
+import StartingCalls from './components/StartingCalls';
 
 export const Navbar = () => {
   const [loggedInGradient, setLoggedInGradient] = useState('from-gray-800 to-gray-600');
@@ -108,6 +109,7 @@ export const Navbar = () => {
         </div>
       </div>
       <Recent />
+      <StartingCalls/>
     </>
   );
 };
