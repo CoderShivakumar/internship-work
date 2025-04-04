@@ -1,27 +1,31 @@
 "use client";
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation'; // <-- Import router
 import { Recent } from './components/Recent';
-import { relative } from 'path';
 import StartingCalls from './components/StartingCalls';
 
 export const Navbar = () => {
   const [loggedInGradient, setLoggedInGradient] = useState('from-gray-800 to-gray-600');
   const [callsGradient, setCallsGradient] = useState('from-gray-700 to-teal-900');
 
+  const router = useRouter(); // <-- Initialize router
+
+  const handleLoginClick = () => {
+    router.push('/signin'); // <-- Redirect to signin page
+  };
+
   const handleMouseMoveLoggedIn = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left; // X position within the container
-    const y = e.clientY - rect.top;   // Y position within the container
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     const width = rect.width;
     const height = rect.height;
 
-    // Calculate intensity based on cursor position (0 to 1)
     const xFactor = x / width;
     const yFactor = y / height;
 
-    // Dynamic gradient based on hover position
-    const blueIntensity = Math.floor(900 - xFactor * 400); // Blue from 900 to 500
-    const grayIntensity = Math.floor(800 - yFactor * 200); // Gray from 800 to 600
+    const blueIntensity = Math.floor(900 - xFactor * 400);
+    const grayIntensity = Math.floor(800 - yFactor * 200);
     setLoggedInGradient(`from-gray-${grayIntensity} to-blue-${blueIntensity}`);
   };
 
@@ -35,8 +39,8 @@ export const Navbar = () => {
     const xFactor = x / width;
     const yFactor = y / height;
 
-    const tealIntensity = Math.floor(900 - xFactor * 400); // Teal from 900 to 500
-    const grayIntensity = Math.floor(700 - yFactor * 100); // Gray from 700 to 600
+    const tealIntensity = Math.floor(900 - xFactor * 400);
+    const grayIntensity = Math.floor(700 - yFactor * 100);
     setCallsGradient(`from-gray-${grayIntensity} to-teal-${tealIntensity}`);
   };
 
@@ -47,31 +51,22 @@ export const Navbar = () => {
   return (
     <>
       <div className="flex">
-        {/* SideNav occupies space, so content starts after it */}
         <div className="flex-1">
           {/* Navbar */}
           <nav className="flex items-center justify-between w-full p-4 bg-black">
-            {/* Left Side: Brand Name */}
-            <a href="" className="ml-5 text-2xl text-white font-oswald">
+            {/* Brand Name */}
+            <a href="#" className="ml-5 text-2xl text-white font-oswald">
               TeleExpress
             </a>
 
-            {/* Right Side: Profile Section */}
+            {/* Gradient Login Button */}
             <div className="flex items-center mr-5 space-x-4">
-              {/* Username and Role */}
-              <div className="flex flex-col">
-                <h2 className="text-xl font-bold text-white">JohnDoe</h2>
-                <h4 className="text-xs text-white">Admin</h4>
-              </div>
-
-              {/* Rounded Image */}
-              <div className="w-10 h-10 overflow-hidden rounded-full">
-                <img
-                  src="/globe.svg"
-                  alt="Profile"
-                  className="object-cover w-full h-full"
-                />
-              </div>
+              <button
+                onClick={handleLoginClick}
+                className="px-6 py-2 font-semibold text-white transition duration-300 ease-in-out transform rounded-full shadow-lg bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 hover:scale-105 hover:from-purple-700 hover:to-red-600"
+              >
+                Login
+              </button>
             </div>
           </nav>
 
@@ -79,7 +74,7 @@ export const Navbar = () => {
           <div className="p-6 ml-[350px]">
             <h1 className="mb-6 text-3xl font-semibold text-white">Statistics</h1>
             <div className="flex gap-6 mt-4">
-              {/* Total Logged-in Users Box */}
+              {/* Logged-in Users Box */}
               <div
                 className={`flex flex-col items-center justify-center w-64 text-white transition-transform transform shadow-lg h-36 bg-gradient-to-br ${loggedInGradient} rounded-xl`}
                 onMouseMove={handleMouseMoveLoggedIn}
@@ -92,7 +87,7 @@ export const Navbar = () => {
                 <p className="mt-1 text-xs text-gray-300">Updated in real-time</p>
               </div>
 
-              {/* Separate Calls for the Day Box */}
+              {/* Calls Today Box */}
               <div
                 className={`flex flex-col items-center justify-center w-64 text-white transition-transform transform shadow-lg h-36 bg-gradient-to-br ${callsGradient} rounded-xl`}
                 onMouseMove={handleMouseMoveCalls}
@@ -108,8 +103,10 @@ export const Navbar = () => {
           </div>
         </div>
       </div>
+
+      {/* Additional Sections */}
       <Recent />
-      <StartingCalls/>
+      <StartingCalls />
     </>
   );
 };
