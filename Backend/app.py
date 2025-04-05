@@ -1,103 +1,98 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
+from flask_mysqldb import MySQL
 from flask_cors import CORS
-import mysql.connector
-from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
 
-# Connect to MySQL
-conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="",
-    database="dashboard_db"
-)
-cursor = conn.cursor(dictionary=True)
+# MySQL configuration
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'tamil_2005' 
+app.config['MYSQL_DB'] = 'dashboard_db'
 
-# Dummy endpoints
-@app.route("/stats", methods=["GET"])
-def get_stats():
-    cursor.execute("SELECT COUNT(*) AS total_signups FROM users")
-    total_signups = cursor.fetchone()["total_signups"]
-    
-    cursor.execute("SELECT SUM(login_count) AS total_logins FROM users")
-    total_logins = cursor.fetchone()["total_logins"] or 0
-    
-    return jsonify({"total_signups": total_signups, "total_logins": total_logins})
+mysql = MySQL(app)
 
+@app.route("/signup", methods=["POST"])
+def signup():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+    existing_user = cursor.fetchone()
+
+    if existing_user:
+        return jsonify({"message": "User already exists"}), 400
+
+    cursor.execute("INSERT INTO users (username, password, last_login) VALUES (%s, %s, %s)",
+                   (username, password, datetime.now()))
+    mysql.connection.commit()
+    cursor.close()
+
+    return jsonify({"message": "User registered successfully"}), 200
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+    user = cursor.fetchone()
+
+    if user:
+        cursor.execute("UPDATE users SET last_login = %s WHERE username = %s", (datetime.now(), username))
+        mysql.connection.commit()
+        cursor.close()
+        return jsonify({"message": "Login successful"}), 200
+    else:
+        return jsonify({"message": "Invalid credentials"}), 401
 
 @app.route("/users", methods=["GET"])
 def get_users():
-    cursor.execute("SELECT id, name, phone, details FROM users")
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT id, username, last_login FROM users ORDER BY last_login DESC")
     users = cursor.fetchall()
-    return jsonify(users)
+    cursor.close()
 
-@app.route("/user/<int:user_id>", methods=["GET"])
-def get_user(user_id):
-    cursor.execute("SELECT id, name, phone, details FROM users WHERE id = %s", (user_id,))
-    user = cursor.fetchone()
-    if user:
-        return jsonify(user)
-    return jsonify({"error": "User not found"}), 404
+    result = [
+        {"id": u[0], "username": u[1], "last_login": u[2].strftime("%Y-%m-%d %H:%M:%S")}
+        for u in users
+    ]
+    return jsonify(result)
 
-@app.route("/top-users", methods=["GET"])
-def get_top_users():
-    cursor.execute("SELECT name, phone, details, login_count FROM users ORDER BY login_count DESC LIMIT 3")
-    top_users = cursor.fetchall()
-    return jsonify(top_users)
+@app.route("/recent-logins", methods=["GET"])
+def recent_logins():
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT username, last_login FROM users ORDER BY last_login DESC LIMIT 3")
+    users = cursor.fetchall()
+    cursor.close()
 
-# 🆕 Signup route
-@app.route("/signup", methods=["POST"])
-def signup():
-    data = request.json
-    username = data.get("username")
-    password = data.get("password")
+    return jsonify([
+        {"username": u[0], "last_login": u[1].strftime("%Y-%m-%d %I:%M %p")}
+        for u in users
+    ])
 
-    cursor.execute("SELECT * FROM users WHERE name = %s", (username,))
-    if cursor.fetchone():
-        return jsonify({"message": "User already exists"}), 400
+@app.route("/total-logins", methods=["GET"])
+def total_logins():
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT COUNT(*) FROM users")
+    count = cursor.fetchone()[0]
+    cursor.close()
+    return jsonify({"total_logins": count})
 
-    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
-    cursor.execute("INSERT INTO users (name, password) VALUES (%s, %s)", (username, hashed_password))
-    conn.commit()
-    return jsonify({"message": "User created successfully"})
-
-# 🆕 Login route
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.json
-    username = data.get("username")
-    password = data.get("password")
-
-    cursor.execute("SELECT * FROM users WHERE name = %s", (username,))
-    user = cursor.fetchone()
-
-    if user and check_password_hash(user["password"], password):
-        # Optional: increment login count
-        cursor.execute("UPDATE users SET login_count = login_count + 1 WHERE id = %s", (user["id"],))
-        conn.commit()
-        return jsonify({"message": "Login successful"})
-    
-    return jsonify({"message": "Invalid credentials"}), 401
-
-# 🆕 Password reset
-@app.route("/reset-password", methods=["POST"])
-def reset_password():
-    data = request.json
-    username = data.get("username")
-    new_password = data.get("new_password")
-
-    cursor.execute("SELECT * FROM users WHERE name = %s", (username,))
-    user = cursor.fetchone()
-
-    if user:
-        hashed_password = generate_password_hash(new_password, method='pbkdf2:sha256')
-        cursor.execute("UPDATE users SET password = %s WHERE name = %s", (hashed_password, username))
-        conn.commit()
-        return jsonify({"message": "Password updated successfully"})
-    
-    return jsonify({"message": "User not found"}), 404
+@app.route("/calls-today", methods=["GET"])
+def calls_today():
+    today = datetime.now().date()
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(last_login) = %s", (today,))
+    count = cursor.fetchone()[0]
+    cursor.close()
+    return jsonify({"calls_today": count})
 
 if __name__ == "__main__":
     app.run(debug=True)
